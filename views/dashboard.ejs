@@ -1,0 +1,321 @@
+<% layout("./layouts/boilerplate") %>
+
+<style>
+    body {
+      background-color: #f5f7fb;
+    }
+    .dashboard-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+</style>
+
+
+  <div class="container py-4">
+    <!-- Welcome -->
+    <div class="card dashboard-card p-4 mb-4">
+      <h2 class="mb-1">Welcome, </h2>
+      <p class="text-muted mb-0">Manage your subscription, golf scores, charity contribution, and winnings.</p>
+    </div>
+
+    <!-- Top Summary Cards -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-4">
+        <div class="card dashboard-card p-3">
+          <h5 class="section-title">Subscription Status</h5>
+          <p class="mb-2">
+            <strong>Plan:</strong> <span id="plan"></span>
+          </p>
+         <a href="/api/v1/subscribe">
+          <button class="btn btn-primary btn-sm">Manage Subscription</button>
+        </a>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card dashboard-card p-3">
+          <h5 class="section-title">Selected Charity</h5>
+            <p class="mb-2">
+              <strong>Name:</strong> <span id="charityName"></span>
+            </p>
+            <p class="mb-2">
+              <strong>Contribution:</strong> <span id="charityPercentage"></span>
+            </p>
+          <a href="/api/v1/update-charity">
+            <button class="btn btn-warning btn-sm">Update Charity</button>
+          </a>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card dashboard-card p-3">
+          <h5 class="section-title">Winnings Overview</h5>
+          <p class="mb-2">
+            <strong>Total Wins:</strong> <span id="totalWins"></span>
+          </p>
+          <p class="mb-2">
+            <strong>Payout Status:</strong> <span id="payoutStatus"></span>
+          </p>
+          <a href="/api/v1/result">
+            <button class="btn btn-success btn-sm">View Results</button>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Add Score Form -->
+      <div class="col-lg-5">
+        <div class="card dashboard-card p-4">
+          <h5 class="section-title">Add Golf Score</h5>
+          <!-- Score Form -->
+          <form id="scoreForm">
+            <div class="mb-3">
+              <label class="form-label">Score Value</label>
+              <input
+                id="scoreValue"
+                type="number"
+                class="form-control"
+                placeholder="Enter score (1-45)"
+                min="1"
+                max="45"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Date</label>
+              <input id="scoreDate" type="date" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Add Score</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Latest Scores -->
+      <div class="col-lg-7">
+        <div class="card dashboard-card p-4">
+          <h5 class="section-title">Latest 5 Scores</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>Score</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <!-- Scores Table -->
+              <tbody id="scoreTableBody"></tbody>
+            </table>
+          </div>
+          <small class="text-muted">Only the latest 5 scores are stored.</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Draw Participation -->
+    <div class="card dashboard-card p-4 mt-4">
+      <h5 class="section-title">Monthly Draw Participation</h5>
+
+      <p class="mb-2">
+        <strong>Current Draw Month:</strong>
+        <span id="drawMonth">March 2026</span>
+      </p>
+
+      <p class="mb-2">
+        <strong>Status:</strong>
+        <span id="drawStatus">Eligible</span>
+      </p>
+
+      <p class="mb-0">
+        <strong>Last Result:</strong>
+        <span id="lastResult">Matched 3 scores - Won ₹500</span>
+      </p>
+    </div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+        alert("Please login first");
+        window.location.href = "/login";
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/v1/me", {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        const data = await res.json();
+        console.log("ME:", data);
+
+        const user = data.user;
+
+        // =====================
+        // Subscription
+        // =====================
+        const planMap = {
+            monthly: "Monthly",
+            quarterly: "Quarterly",
+            yearly: "Yearly"
+        };
+
+        document.getElementById("plan").innerText =
+            planMap[user.subscriptionPlan] || "Not Subscribed";
+
+        // =====================
+        // Charity
+        // =====================
+        document.getElementById("charityName").innerText =
+            user.charity?.name || "Not Selected";
+
+        document.getElementById("charityPercentage").innerText =
+            user.charityPercentage ? user.charityPercentage + "%" : "0%";
+
+        // =====================
+        // Scores Table
+        // =====================
+        const tbody = document.getElementById("scoreTableBody");
+        tbody.innerHTML = "";
+
+        if (user.scores && user.scores.length > 0) {
+            user.scores.forEach((score, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${score.value}</td>
+                        <td>${new Date(score.date).toLocaleDateString()}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="3">No scores</td></tr>`;
+        }
+
+        // =====================
+        // Winnings
+        // =====================
+        document.getElementById("totalWins").innerText =
+            user.scores?.length || 0;
+
+        document.getElementById("payoutStatus").innerText =
+            user.isSubscribed ? "Active" : "Inactive";
+
+        // =====================
+        // Draw Section
+        // =====================
+        const now = new Date();
+        const monthYear = now.toLocaleString("default", {
+            month: "long",
+            year: "numeric"
+        });
+
+        document.getElementById("drawMonth").innerText = monthYear;
+
+        const isEligible = user.scores && user.scores.length >= 3;
+
+        document.getElementById("drawStatus").innerText =
+            isEligible ? "Eligible" : "Not Eligible";
+
+        if (user.scores && user.scores.length > 0) {
+            const lastScore = user.scores[user.scores.length - 1];
+
+            document.getElementById("lastResult").innerText =
+                `Last score: ${lastScore.value}`;
+        } else {
+            document.getElementById("lastResult").innerText = "No result yet";
+        }
+
+    } catch (err) {
+        console.log(err);
+        alert("Failed to load dashboard");
+    }
+
+    // =====================
+    // Add Score
+    // =====================
+    const form = document.getElementById("scoreForm");
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const value = document.getElementById("scoreValue").value;
+        const date = document.getElementById("scoreDate").value;
+
+        try {
+            const res = await fetch("/api/v1/add-score", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ value, date })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                return alert(data.message);
+            }
+
+            alert("Score added!");
+            location.reload();
+
+        } catch (err) {
+            console.log(err);
+            alert("Error adding score");
+        }
+    });
+
+});
+</script>
+
+<script>
+async function loadDashboardWinnings() {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    document.getElementById("dashboardTotalWins").textContent = "0";
+    document.getElementById("dashboardPayoutStatus").textContent = "Not Logged In";
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/user/winnings-data", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      document.getElementById("dashboardTotalWins").textContent = "0";
+      document.getElementById("dashboardPayoutStatus").textContent = "Unavailable";
+      return;
+    }
+
+    document.getElementById("dashboardTotalWins").textContent = data.totalWins || 0;
+    document.getElementById("dashboardPayoutStatus").textContent = data.payoutStatus || "No Data";
+  } catch (err) {
+    console.log("dashboard winnings error:", err);
+    document.getElementById("dashboardTotalWins").textContent = "0";
+    document.getElementById("dashboardPayoutStatus").textContent = "Error";
+  }
+}
+
+loadDashboardWinnings();
+</script>

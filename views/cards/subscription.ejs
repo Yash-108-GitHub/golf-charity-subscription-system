@@ -1,0 +1,85 @@
+<% layout("./layouts/boilerplate") %>
+<style>
+  body {
+    background-color: #f4f6f9;
+  }
+  .dashboard-card {
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: none;
+    background: #fff;
+  }
+  .section-title {
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+</style>
+
+<div class="container py-5">
+  <div class="card dashboard-card p-4 mx-auto" style="max-width: 700px;">
+    <h2 class="section-title">Manage Subscription</h2>
+
+    <p><strong>Current Plan:</strong></p>
+
+    <form id="subscriptionForm">
+      <div class="mb-3">
+        <label class="form-label">Choose Plan</label>
+        <select class="form-select" name="plan" required>
+          <option value="">Select a plan</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Payment Method</label>
+        <select class="form-select" name="paymentMethod" required>
+          <option value="">Select payment method</option>
+          <option value="upi">UPI</option>
+          <option value="card">Card</option>
+          <option value="netbanking">Net Banking</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">Update Subscription</button>
+    </form>
+
+    <div class="mt-3 text-center">
+      <a href="/api/user/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById("subscriptionForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const plan = e.target.plan.value;
+    const paymentMethod = e.target.paymentMethod.value;
+
+    const token = localStorage.getItem("token");
+
+    try {
+        const res = await fetch("/api/v1/subscribe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ plan, paymentMethod })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            return alert(data.message || "Subscription update failed");
+        }
+
+        alert("Subscription updated successfully");
+        window.location.href = "/api/user/dashboard";
+    } catch (err) {
+        console.log(err);
+        alert("Something went wrong");
+    }
+});
+</script>

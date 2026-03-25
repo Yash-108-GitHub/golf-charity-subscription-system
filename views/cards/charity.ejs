@@ -1,0 +1,147 @@
+<% layout("./layouts/boilerplate") %>
+
+<style>
+  body {
+    background-color: #f4f6f9;
+  }
+  .dashboard-card {
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: none;
+    background: #fff;
+  }
+  .section-title {
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+</style>
+
+<div class="container py-5">
+  <div class="card dashboard-card p-4 mx-auto" style="max-width: 700px;">
+    <h2 class="section-title">Update Charity</h2>
+
+   <p><strong>Current Charity:</strong> <span id="currentCharity">Loading...</span></p>
+   <p><strong>Current Contribution:</strong> <span id="currentContribution">Loading...</span></p>
+
+    <form id="charityForm">
+      <div class="mb-3">
+        <label class="form-label">Select Charity</label>
+        <select class="form-select" name="charity" required>
+          <option value="">Choose charity</option>
+          <option value="Helping Hands Foundation">Helping Hands Foundation</option>
+          <option value="Care for Children">Care for Children</option>
+          <option value="Food Relief Trust">Food Relief Trust</option>
+          <option value="Green Earth NGO">Green Earth NGO</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Contribution Percentage</label>
+        <select class="form-select" name="charityPercentage" required>
+          <option value="">Select percentage</option>
+           <option value="5">5%</option>
+          <option value="10">10%</option>
+          <option value="15">15%</option>
+          <option value="20">20%</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-warning w-100">Update Charity</button>
+    </form>
+
+    <div class="mt-3 text-center">
+      <a href="/api/user/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById("charityForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    alert("Please login first");
+    return window.location.href = "/api/user/login";
+  }
+
+  const formData = new FormData(e.target);
+  const data = Object.fromEntries(formData.entries());
+
+  data.charityPercentage = Number(data.charityPercentage);
+
+  try {
+    const res = await fetch("/api/user/update-charity", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      return alert(result.message || "Failed to update charity");
+    }
+
+    alert(result.message || "Charity updated successfully");
+    window.location.href = "/api/user/dashboard";
+  } catch (err) {
+    console.log(err);
+    alert("Something went wrong");
+  }
+});
+</script>
+
+<script>
+async function loadProfile() {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    document.getElementById("currentCharity").textContent = "Not logged in";
+    document.getElementById("currentContribution").textContent = "0%";
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/user/profile", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      document.getElementById("currentCharity").textContent = "Not Selected";
+      document.getElementById("currentContribution").textContent = "0%";
+      return;
+    }
+
+    document.getElementById("currentCharity").textContent =
+      result.user && result.user.charity ? result.user.charity.name : "Not Selected";
+
+    document.getElementById("currentContribution").textContent =
+      result.user && result.user.charityPercentage ? result.user.charityPercentage + "%" : "0%";
+
+    if (result.user && result.user.charity) {
+      document.querySelector('select[name="charity"]').value = result.user.charity.name;
+    }
+
+    if (result.user && result.user.charityPercentage) {
+      document.querySelector('select[name="charityPercentage"]').value = String(result.user.charityPercentage);
+    }
+
+  } catch (err) {
+    console.log(err);
+    document.getElementById("currentCharity").textContent = "Error";
+    document.getElementById("currentContribution").textContent = "Error";
+  }
+}
+
+loadProfile();
+</script>

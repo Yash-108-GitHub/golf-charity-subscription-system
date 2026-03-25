@@ -1,0 +1,197 @@
+<% layout("./layouts/boilerplate") %>
+
+<style>
+  body {
+    background-color: #f4f6f9;
+  }
+
+  .dashboard-card {
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: none;
+    background: #fff;
+  }
+
+  .section-title {
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+</style>
+
+<div class="container py-5">
+  <div class="card dashboard-card p-4 mx-auto" style="max-width: 1100px;">
+    <h2 class="section-title">Winnings & Results</h2>
+
+    <div class="row mb-4">
+      <div class="col-md-4 mb-3">
+        <div class="p-3 border rounded h-100">
+          <h5>Total Wins</h5>
+          <p class="mb-0" id="totalWins">Loading...</p>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="p-3 border rounded h-100">
+          <h5>Total Amount Won</h5>
+          <p class="mb-0" id="totalAmount">Loading...</p>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="p-3 border rounded h-100">
+          <h5>Payout Status</h5>
+          <p class="mb-0" id="payoutStatus">Loading...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="p-3 border rounded h-100">
+          <h5>Last Result</h5>
+          <p class="mb-0" id="lastResult">Loading...</p>
+        </div>
+      </div>
+    </div>
+
+    <h5 class="mb-3">Recent Result History</h5>
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th>
+            <th>Draw Month</th>
+            <th>Matched Scores</th>
+            <th>Prize</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTable">
+          <tr>
+            <td colspan="5" class="text-center">Loading results...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3">
+      <a href="/api/user/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function loadWinnings() {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      document.getElementById("totalWins").textContent = "0";
+      document.getElementById("totalAmount").textContent = "₹0";
+      document.getElementById("payoutStatus").innerHTML =
+        '<span class="badge bg-secondary">Not Logged In</span>';
+      document.getElementById("lastResult").textContent = "Please login first";
+      document.getElementById("resultsTable").innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center">Please login to view results</td>
+        </tr>
+      `;
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/user/winnings-data", {
+        method: "GET",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+       document.getElementById("totalWins").textContent = data.totalWins || 0;
+        document.getElementById("totalAmount").textContent = "₹0";
+        document.getElementById("payoutStatus").innerHTML =
+          '<span class="badge bg-secondary">Unavailable</span>';
+        document.getElementById("lastResult").textContent = "No results found";
+        document.getElementById("resultsTable").innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center">${data.message || "Failed to load results"}</td>
+          </tr>
+        `;
+        return;
+      }
+
+      document.getElementById("totalWins").textContent = data.totalWinsCount || 0;
+      document.getElementById("totalAmount").textContent = "₹" + (data.totalAmountWon || 0);
+
+      if (data.payoutStatus === "Pending") {
+        document.getElementById("payoutStatus").innerHTML =
+          '<span class="badge bg-warning text-dark">Pending</span>';
+      } else if (data.payoutStatus === "Paid") {
+        document.getElementById("payoutStatus").innerHTML =
+          '<span class="badge bg-success">Paid</span>';
+      } else {
+        document.getElementById("payoutStatus").innerHTML =
+          '<span class="badge bg-secondary">No Data</span>';
+      }
+
+      if (data.lastResult) {
+        document.getElementById("lastResult").textContent =
+          `Matched ${data.lastResult.matchedCount} scores - Won ₹${data.lastResult.amountWon}`;
+      } else {
+        document.getElementById("lastResult").textContent = "No results yet";
+      }
+
+      const tableBody = document.getElementById("resultsTable");
+
+      if (!data.winners || data.winners.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center">No winnings found</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = "";
+
+      data.winners.forEach((winner, index) => {
+        const drawMonth =
+          winner.drawId && winner.drawId.drawMonth
+            ? winner.drawId.drawMonth
+            : "N/A";
+
+        const payoutBadge =
+          winner.payoutStatus === "pending"
+            ? '<span class="badge bg-warning text-dark">Pending</span>'
+            : '<span class="badge bg-success">Paid</span>';
+
+        tableBody.innerHTML += `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${drawMonth}</td>
+            <td>${winner.matchedCount}</td>
+            <td>₹${winner.amountWon}</td>
+            <td>${payoutBadge}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.log("loadWinnings error:", err);
+      document.getElementById("totalWins").textContent = "0";
+      document.getElementById("totalAmount").textContent = "₹0";
+      document.getElementById("payoutStatus").innerHTML =
+        '<span class="badge bg-danger">Error</span>';
+      document.getElementById("lastResult").textContent = "Something went wrong";
+      document.getElementById("resultsTable").innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center">Something went wrong while loading results</td>
+        </tr>
+      `;
+    }
+  }
+
+  loadWinnings();
+</script>
