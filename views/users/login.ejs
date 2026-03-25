@@ -44,8 +44,14 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
 
-        // ✅ redirect here
-        window.location.href = "/api/user/dashboard";
+        console.log(data.role); // 🔥 debug
+
+        // ✅ FIXED REDIRECT
+        if (data.role === "admin") {
+            window.location.href = "/api/admin/dashboard";
+        } else {
+            window.location.href = "/api/user/dashboard";
+        } 
 
     } catch (err) {
         console.log(err);
